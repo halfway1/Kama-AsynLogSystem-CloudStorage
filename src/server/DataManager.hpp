@@ -5,7 +5,8 @@
 namespace storage
 {
     // 用作初始化存储文件的属性信息
-    typedef struct StorageInfo{                   
+    typedef struct StorageInfo
+    {
         time_t mtime_;
         time_t atime_;
         size_t fsize_;
@@ -30,12 +31,16 @@ namespace storage
             // 下载路径前缀+文件名
             storage::Config *config = storage::Config::GetInstance();
             url_ = config->GetDownloadPrefix() + f.FileName();
-            mylog::GetLogger("asynclogger")->Info("download_url:%s,mtime_:%s,atime_:%s,fsize_:%d", url_.c_str(),ctime(&mtime_),ctime(&atime_),fsize_);
+            mylog::GetLogger("asynclogger")->Info("download_url:%s,mtime_:%s,atime_:%s,fsize_:%d", url_.c_str(), ctime(&mtime_), ctime(&atime_), fsize_);
             mylog::GetLogger("asynclogger")->Info("NewStorageInfo end");
             return true;
+            // 传入 storage_path 作为参数，检查文件是否存在。
+            // 使用 FileUtil 获取文件的修改时间、访问时间、大小等信息。
+            // 通过 Config::GetInstance()->GetDownloadPrefix() 获取下载前缀，拼接生成 URL。
+            // 记录日志，返回 true 表示初始化成功。
         }
     } StorageInfo; // namespace StorageInfo
-
+    // 该类用于管理存储信息
     class DataManager
     {
     private:
@@ -48,10 +53,12 @@ namespace storage
         {
             mylog::GetLogger("asynclogger")->Info("DataManager construct start");
             storage_file_ = storage::Config::GetInstance()->GetStorageInfoFile();
+            // 从 Config::GetInstance()->GetStorageInfoFile() 读取存储路径
             pthread_rwlock_init(&rwlock_, NULL);
-            InitLoad();
+            InitLoad(); // 初始化加载
             mylog::GetLogger("asynclogger")->Info("DataManager construct end");
         }
+
         ~DataManager()
         {
             pthread_rwlock_destroy(&rwlock_);
@@ -61,7 +68,8 @@ namespace storage
         {
             mylog::GetLogger("asynclogger")->Info("init datamanager");
             storage::FileUtil f(storage_file_);
-            if (!f.Exists()){
+            if (!f.Exists())
+            {
                 mylog::GetLogger("asynclogger")->Info("there is no storage file info need to load");
                 return true;
             }
@@ -73,7 +81,7 @@ namespace storage
             // 反序列化
             Json::Value root;
             storage::JsonUtil::UnSerialize(body, &root);
-            // 3，将反序列化得到的Json::Value中的数据添加到table中
+            // 将反序列化得到的Json::Value中的数据添加到table中
             for (int i = 0; i < root.size(); i++)
             {
                 StorageInfo info;
@@ -86,18 +94,19 @@ namespace storage
             }
             return true;
         }
-
+        // 该函数用于持久化存储
         bool Storage()
         { // 每次有信息改变则需要持久化存储一次
-// 把table_中的数据转成json格式存入文件
+            // 把table_中的数据转成json格式存入文件
             mylog::GetLogger("asynclogger")->Info("message storage start");
             std::vector<StorageInfo> arr;
+            // 获取所有存储信息
             if (!GetAll(&arr))
             {
                 mylog::GetLogger("asynclogger")->Warn("GetAll fail,can't get StorageInfo");
                 return false;
             }
-
+            // 将存储信息转成json格式
             Json::Value root; // root中存着json::value对象
             for (auto e : arr)
             {
@@ -114,23 +123,27 @@ namespace storage
             std::string body;
             mylog::GetLogger("asynclogger")->Info("new message for StorageInfo:%s", body.c_str());
             JsonUtil::Serialize(root, &body);
+            // 将root中的数据序列化成字符串
 
-            // 写入文件
             FileUtil f(storage_file_);
-            
-            if (f.SetContent(body.c_str(),body.size()) == false)
+            // 写入文件
+            if (f.SetContent(body.c_str(), body.size()) == false)
+            {
                 mylog::GetLogger("asynclogger")->Error("SetContent for StorageInfo Error");
+                return false;
+            }
 
             mylog::GetLogger("asynclogger")->Info("message storage end");
             return true;
         }
-
+        // 该函数用于插入存储信息
         bool Insert(const StorageInfo &info)
         {
             mylog::GetLogger("asynclogger")->Info("data_message Insert start");
             pthread_rwlock_wrlock(&rwlock_); // 加写锁
             table_[info.url_] = info;
             pthread_rwlock_unlock(&rwlock_);
+            // 持久化存储
             if (Storage() == false)
             {
                 mylog::GetLogger("asynclogger")->Error("data_message Insert:Storage Error");
@@ -139,7 +152,7 @@ namespace storage
             mylog::GetLogger("asynclogger")->Info("data_message Insert end");
             return true;
         }
-
+        // 该函数用于更新存储信息
         bool Update(const StorageInfo &info)
         {
             mylog::GetLogger("asynclogger")->Info("data_message Update start");
@@ -154,6 +167,7 @@ namespace storage
             mylog::GetLogger("asynclogger")->Info("data_message Update end");
             return true;
         }
+        // 通过 URL（key） 查找对应的 StorageInfo
         bool GetOneByURL(const std::string &key, StorageInfo *info)
         {
             pthread_rwlock_wrlock(&rwlock_);
@@ -166,6 +180,7 @@ namespace storage
             pthread_rwlock_wrlock(&rwlock_);
             return true;
         }
+        // 通过 storage_path 查找对应的 StorageInfo
         bool GetOneByStoragePath(const std::string &storage_path, StorageInfo *info)
         {
             pthread_rwlock_wrlock(&rwlock_);
@@ -182,9 +197,11 @@ namespace storage
             pthread_rwlock_unlock(&rwlock_);
             return false;
         }
+        // 获取所有存储信息
         bool GetAll(std::vector<StorageInfo> *arry)
         {
             pthread_rwlock_wrlock(&rwlock_);
+            // 遍历table_，将所有存储信息添加到arry中
             for (auto e : table_)
                 arry->emplace_back(e.second);
             pthread_rwlock_unlock(&rwlock_);

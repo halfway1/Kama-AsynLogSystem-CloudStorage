@@ -16,12 +16,12 @@
 namespace storage
 {
     namespace fs = std::experimental::filesystem;
-
+    // 将字符转换为十六进制
     static unsigned char ToHex(unsigned char x)
     {
         return x > 9 ? x + 55 : x + 48;
     }
-
+    // 将十六进制转换为字符
     static unsigned char FromHex(unsigned char x)
     {
         unsigned char y;
@@ -35,6 +35,7 @@ namespace storage
             assert(0);
         return y;
     }
+    // 将 URL 解码
     static std::string UrlDecode(const std::string &str)
     {
         std::string strTemp = "";
@@ -43,6 +44,7 @@ namespace storage
         {
             // if (str[i] == '+')
             //     strTemp += ' ';
+            // 如果字符串中包含 %，则将 % 后面的两个字符转换为十六进制
             if (str[i] == '%')
             {
                 assert(i + 2 < length);
@@ -55,7 +57,7 @@ namespace storage
         }
         return strTemp;
     }
-
+    // 该类用于文件操作
     class FileUtil
     {
     private:
@@ -73,7 +75,7 @@ namespace storage
             auto ret = stat(filename_.c_str(), &s);
             if (ret == -1)
             {
-                mylog::GetLogger("asynclogger")->Info("%s, Get file size failed: %s", filename_.c_str(),strerror(errno));
+                mylog::GetLogger("asynclogger")->Info("%s, Get file size failed: %s", filename_.c_str(), strerror(errno));
                 return -1;
             }
             return s.st_size;
@@ -85,7 +87,7 @@ namespace storage
             auto ret = stat(filename_.c_str(), &s);
             if (ret == -1)
             {
-                mylog::GetLogger("asynclogger")->Info("%s, Get file access time failed: %s", filename_.c_str(),strerror(errno));
+                mylog::GetLogger("asynclogger")->Info("%s, Get file access time failed: %s", filename_.c_str(), strerror(errno));
                 return -1;
             }
             return s.st_atime;
@@ -98,7 +100,7 @@ namespace storage
             auto ret = stat(filename_.c_str(), &s);
             if (ret == -1)
             {
-                mylog::GetLogger("asynclogger")->Info("%s, Get file modify time failed: %s",filename_.c_str(), strerror(errno));
+                mylog::GetLogger("asynclogger")->Info("%s, Get file modify time failed: %s", filename_.c_str(), strerror(errno));
                 return -1;
             }
             return s.st_mtime;
@@ -128,7 +130,7 @@ namespace storage
             ifs.open(filename_.c_str(), std::ios::binary);
             if (ifs.is_open() == false)
             {
-                mylog::GetLogger("asynclogger")->Info("%s,file open error",filename_.c_str());
+                mylog::GetLogger("asynclogger")->Info("%s,file open error", filename_.c_str());
                 return false;
             }
 
@@ -138,7 +140,7 @@ namespace storage
             ifs.read(&(*content)[0], len);
             if (!ifs.good())
             {
-                mylog::GetLogger("asynclogger")->Info("%s,read file content error",filename_.c_str());
+                mylog::GetLogger("asynclogger")->Info("%s,read file content error", filename_.c_str());
                 ifs.close();
                 return false;
             }
@@ -166,7 +168,7 @@ namespace storage
             ofs.write(content, len);
             if (!ofs.good())
             {
-                mylog::GetLogger("asynclogger")->Info("%s, file set content error",filename_.c_str());
+                mylog::GetLogger("asynclogger")->Info("%s, file set content error", filename_.c_str());
                 ofs.close();
             }
             ofs.close();
@@ -178,7 +180,7 @@ namespace storage
         //  压缩文件
         bool Compress(const std::string &content, int format)
         {
-
+            // 压缩文件
             std::string packed = bundle::pack(format, content);
             if (packed.size() == 0)
             {
@@ -189,18 +191,19 @@ namespace storage
             FileUtil f(filename_);
             if (f.SetContent(packed.c_str(), packed.size()) == false)
             {
-                mylog::GetLogger("asynclogger")->Info("filename:%s, Compress SetContent error",filename_.c_str());
+                mylog::GetLogger("asynclogger")->Info("filename:%s, Compress SetContent error", filename_.c_str());
                 return false;
             }
             return true;
         }
+        // 解压缩文件
         bool UnCompress(std::string &download_path)
         {
             // 将当前压缩包数据读取出来
             std::string body;
             if (this->GetContent(&body) == false)
             {
-                mylog::GetLogger("asynclogger")->Info("filename:%s, uncompress get file content failed!",filename_.c_str());
+                mylog::GetLogger("asynclogger")->Info("filename:%s, uncompress get file content failed!", filename_.c_str());
                 return false;
             }
             // 对压缩的数据进行解压缩
@@ -209,7 +212,7 @@ namespace storage
             FileUtil fu(download_path);
             if (fu.SetContent(unpacked.c_str(), unpacked.size()) == false)
             {
-                mylog::GetLogger("asynclogger")->Info("filename:%s, uncompress write packed data failed!",filename_.c_str());
+                mylog::GetLogger("asynclogger")->Info("filename:%s, uncompress write packed data failed!", filename_.c_str());
                 return false;
             }
             return true;
@@ -217,18 +220,19 @@ namespace storage
         ///////////////////////////////////////////
         // 目录操作
         // 以下三个函数使用c++17中文件系统给的库函数实现
+        // 判断文件是否存在
         bool Exists()
         {
             return fs::exists(filename_);
         }
-
+        // 创建目录
         bool CreateDirectory()
         {
             if (Exists())
                 return true;
             return fs::create_directories(filename_);
         }
-
+        // 扫描目录
         bool ScanDirectory(std::vector<std::string> *arry)
         {
             for (auto &p : fs::directory_iterator(filename_))
@@ -241,7 +245,7 @@ namespace storage
             return true;
         }
     };
-
+    // 该类用于JSON操作
     class JsonUtil
     {
     public:
@@ -249,7 +253,7 @@ namespace storage
         {
             // 建造者生成->建造者实例化json写对象->调用写对象中的接口进行序列化写入str
             Json::StreamWriterBuilder swb;
-            swb["emitUTF8"] = true;
+            swb["emitUTF8"] = true; // 设置UTF-8编码
             std::unique_ptr<Json::StreamWriter> usw(swb.newStreamWriter());
             std::stringstream ss;
             if (usw->write(val, &ss) != 0)
@@ -271,7 +275,7 @@ namespace storage
                 mylog::GetLogger("asynclogger")->Info("parse error");
                 return false;
             }
-            return false;
+            return true;
         }
     };
 }

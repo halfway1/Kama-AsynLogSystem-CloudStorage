@@ -17,21 +17,24 @@
 extern storage::DataManager *data_;
 namespace storage
 {
+    // 该类用于处理HTTP请求
     class Service
     {
     public:
         Service()
         {
-#ifdef DEBUG_LOG
+#ifdef DEBUG_LOG // 若开启 DEBUG_LOG，则记录日志
             mylog::GetLogger("asynclogger")->Debug("Service start(Construct)");
 #endif
             server_port_ = Config::GetInstance()->GetServerPort();
             server_ip_ = Config::GetInstance()->GetServerIp();
             download_prefix_ = Config::GetInstance()->GetDownloadPrefix();
+            // 获取服务器端口、IP地址和下载前缀
 #ifdef DEBUG_LOG
             mylog::GetLogger("asynclogger")->Debug("Service end(Construct)");
 #endif
         }
+        // 该函数用于初始化服务
         bool RunModule()
         {
             // 初始化环境
@@ -57,6 +60,7 @@ namespace storage
             // 设定回调函数
             // 指定generic callback，也可以为特定的URI指定callback
             evhttp_set_gencb(httpd, GenHandler, NULL);
+            // 设置 HTTP 请求的通用回调函数 (GenHandler)
 
             if (base)
             {
@@ -68,6 +72,7 @@ namespace storage
                     mylog::GetLogger("asynclogger")->Debug("event_base_dispatch err");
                 }
             }
+            // 释放资源
             if (base)
                 event_base_free(base);
             if (httpd)
@@ -81,6 +86,7 @@ namespace storage
         std::string download_prefix_;
 
     private:
+        // 该函数用于处理 HTTP 请求
         static void GenHandler(struct evhttp_request *req, void *arg)
         {
             std::string path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
@@ -106,9 +112,10 @@ namespace storage
             else
             {
                 evhttp_send_reply(req, HTTP_NOTFOUND, "Not Found", NULL);
+                // 发送404错误
             }
         }
-
+        // 该函数用于上传文件
         static void Upload(struct evhttp_request *req, void *arg)
         {
             mylog::GetLogger("asynclogger")->Info("Upload start");
@@ -130,7 +137,9 @@ namespace storage
                 mylog::GetLogger("asynclogger")->Info("request body is empty");
                 return;
             }
+            // 创建一个字符串，长度为请求体的长度
             std::string content(len, 0);
+            // 将请求体的内容复制到content中
             if (-1 == evbuffer_copyout(buf, (void *)content.c_str(), len))
             {
                 mylog::GetLogger("asynclogger")->Error("evbuffer_copyout error");
@@ -176,6 +185,7 @@ namespace storage
             FileUtil fu(storage_path);
             if (storage_path.find("low_storage") != std::string::npos)
             {
+                // 写入文件
                 if (fu.SetContent(content.c_str(), len) == false)
                 {
                     mylog::GetLogger("asynclogger")->Error("low_storage fail, evhttp_send_reply: HTTP_INTERNAL");
@@ -187,8 +197,9 @@ namespace storage
                     mylog::GetLogger("asynclogger")->Info("low_storage success");
                 }
             }
-            else
+            else // 深度存储
             {
+                // 压缩文件
                 if (fu.Compress(content, Config::GetInstance()->GetBundleFormat()) == false)
                 {
                     mylog::GetLogger("asynclogger")->Error("deep_storage fail, evhttp_send_reply: HTTP_INTERNAL");
@@ -206,10 +217,12 @@ namespace storage
             info.NewStorageInfo(storage_path); // 组织存储的文件信息
             data_->Insert(info);               // 向数据管理模块添加存储的文件信息
 
+            // 发送200响应
             evhttp_send_reply(req, HTTP_OK, "Success", NULL);
             mylog::GetLogger("asynclogger")->Info("upload finish:success");
         }
 
+        // 该函数用于将时间转换为字符串
         static std::string TimetoStr(time_t t)
         {
             std::string tmp = std::ctime(&t);
@@ -268,6 +281,7 @@ namespace storage
             ss << std::fixed << std::setprecision(2) << size << " " << units[unit_index];
             return ss.str();
         }
+        // 该函数用于显示已存储文件列表
         static void ListShow(struct evhttp_request *req, void *arg)
         {
             mylog::GetLogger("asynclogger")->Info("ListShow()");
@@ -282,14 +296,14 @@ namespace storage
                 std::istreambuf_iterator<char>());
 
             // 替换html文件中的占位符
-            //替换文件列表进html
+            // 替换文件列表进html
             templateContent = std::regex_replace(templateContent,
                                                  std::regex("\\{\\{FILE_LIST\\}\\}"),
                                                  generateModernFileList(arry));
-            //替换服务器地址进hrml
+            // 替换服务器地址进hrml
             templateContent = std::regex_replace(templateContent,
                                                  std::regex("\\{\\{BACKEND_URL\\}\\}"),
-                                                "http://"+storage::Config::GetInstance()->GetServerIp()+":"+std::to_string(storage::Config::GetInstance()->GetServerPort()));
+                                                 "http://" + storage::Config::GetInstance()->GetServerIp() + ":" + std::to_string(storage::Config::GetInstance()->GetServerPort()));
             // 获取请求的输出evbuffer
             struct evbuffer *buf = evhttp_request_get_output_buffer(req);
             auto response_body = templateContent;
@@ -299,6 +313,7 @@ namespace storage
             evhttp_send_reply(req, HTTP_OK, NULL, NULL);
             mylog::GetLogger("asynclogger")->Info("ListShow() finish");
         }
+        // 该函数用于获取ETag
         static std::string GetETag(const StorageInfo &info)
         {
             // 自定义etag :  filename-fsize-mtime
@@ -310,6 +325,7 @@ namespace storage
             etag += std::to_string(info.mtime_);
             return etag;
         }
+        // 该函数用于下载文件
         static void Download(struct evhttp_request *req, void *arg)
         {
             // 1. 获取客户端请求的资源路径path   req.path
@@ -317,7 +333,7 @@ namespace storage
             StorageInfo info;
             std::string resource_path = evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req));
             resource_path = UrlDecode(resource_path);
-            data_->GetOneByURL(resource_path, &info);
+            data_->GetOneByURL(resource_path, &info); // 通过 URL（key） 查找对应的 StorageInfo
             mylog::GetLogger("asynclogger")->Info("request resource_path:%s", resource_path.c_str());
 
             std::string download_path = info.storage_path_;
@@ -331,6 +347,9 @@ namespace storage
                 FileUtil dirCreate(Config::GetInstance()->GetLowStorageDir());
                 dirCreate.CreateDirectory();
                 fu.UnCompress(download_path); // 将文件解压到low_storage下去或者再创一个文件夹做中转
+                // 如果文件存储在 深度存储（deep storage），则 解压缩 到 low_storage 目录，以便提供下载。
+                // 先检查目标存储目录是否存在，若不存在，则创建目录。
+                // 调用 UnCompress() 方法 解压文件，以便用户下载未压缩版本
             }
             mylog::GetLogger("asynclogger")->Info("request download_path:%s", download_path.c_str());
             FileUtil fu(download_path);
@@ -370,6 +389,7 @@ namespace storage
                 evhttp_send_reply(req, 404, download_path.c_str(), NULL);
                 return;
             }
+            // 获取输出缓冲区
             evbuffer *outbuf = evhttp_request_get_output_buffer(req);
             int fd = open(download_path.c_str(), O_RDONLY);
             if (fd == -1)
@@ -389,14 +409,15 @@ namespace storage
             evhttp_add_header(req->output_headers, "Content-Type", "application/octet-stream");
             if (retrans == false)
             {
-                evhttp_send_reply(req, HTTP_OK, "Success", NULL);
+                evhttp_send_reply(req, HTTP_OK, "Success", NULL); // 发送200响应:完整下载文件
                 mylog::GetLogger("asynclogger")->Info("evhttp_send_reply: HTTP_OK");
             }
             else
             {
-                evhttp_send_reply(req, 206, "breakpoint continuous transmission", NULL); // 区间请求响应的是206
+                evhttp_send_reply(req, 206, "breakpoint continuous transmission", NULL); // 区间请求响应的是206:断点续传
                 mylog::GetLogger("asynclogger")->Info("evhttp_send_reply: 206");
             }
+            // 6. 清理临时解压缩文件
             if (download_path != info.storage_path_)
             {
                 remove(download_path.c_str()); // 删除文件

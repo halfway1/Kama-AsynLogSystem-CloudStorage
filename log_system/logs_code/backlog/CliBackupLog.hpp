@@ -10,23 +10,26 @@
 #include <unistd.h>
 #include "../Util.hpp"
 
+// 全局变量，用于存储配置文件中的数据
 extern mylog::Util::JsonData *g_conf_data;
+
+// 该函数用于启动备份
 void start_backup(const std::string &message)
 {
-    // 1. create socket
+    // 1. 创建socket
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0)
     {
         std::cout << __FILE__ << __LINE__ << "socket error : " << strerror(errno) << std::endl;
         perror(NULL);
     }
-
+    // 2. 创建服务器地址结构体  
     struct sockaddr_in server;
     memset(&server, 0, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(g_conf_data->backup_port);
     inet_aton(g_conf_data->backup_addr.c_str(), &(server.sin_addr));
-
+    // 3. 连接服务器
     int cnt = 5;
     while (-1 == connect(sock, (struct sockaddr *)&server, sizeof(server)))
     {
@@ -40,7 +43,7 @@ void start_backup(const std::string &message)
         }
     }
 
-    // 3. 连接成功
+    // 4. 连接成功，发送日志信息    
     char buffer[1024];
     if (-1 == write(sock, message.c_str(), message.size()))
     {

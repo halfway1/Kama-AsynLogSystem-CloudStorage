@@ -11,6 +11,7 @@ namespace mylog
   struct LogMessage
   {
     using ptr = std::shared_ptr<LogMessage>;
+    // 构造函数
     LogMessage() = default;
     LogMessage(LogLevel::value level, std::string file, size_t line,
                std::string name, std::string payload)
@@ -21,7 +22,7 @@ namespace mylog
           line_(line),
           ctime_(Util::Date::Now()),
           tid_(std::this_thread::get_id()) {}
-
+    // 格式化日志消息
     std::string format()
     {
       std::stringstream ret;

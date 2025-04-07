@@ -17,14 +17,17 @@ namespace mylog
         public:
             static time_t Now() { return time(nullptr); }
         };
+
         class File
         {
         public:
+            // 该函数用于检查文件是否存在
             static bool Exists(const std::string &filename)
             {
                 struct stat st;
                 return (0 == stat(filename.c_str(), &st));
             }
+            // 该函数用于获取文件路径
             static std::string Path(const std::string &filename)
             {
                 if (filename.empty())
@@ -34,15 +37,18 @@ namespace mylog
                     return filename.substr(0, pos + 1);
                 return "";
             }
+            // 该函数用于创建目录
             static void CreateDirectory(const std::string &pathname)
             {
                 if (pathname.empty())
                     perror("文件所给路径为空：");
                 // 文件不存在再创建
-                if (!Exists(pathname)){
+                if (!Exists(pathname))
+                {
                     size_t pos, index = 0;
                     size_t size = pathname.size();
-                    while (index < size){
+                    while (index < size)
+                    {
                         pos = pathname.find_first_of("/\\", index);
                         if (pos == std::string::npos)
                         {
@@ -113,47 +119,57 @@ namespace mylog
                 return true;
             }
         }; // class file
+        // 该类用于序列化和反序列化json
         class JsonUtil
         {
         public:
+            // 该函数用于序列化json
             static bool Serialize(const Json::Value &val, std::string *str)
             {
                 // 建造者生成->建造者实例化json写对象->调用写对象中的接口进行序列化写入str
-                Json::StreamWriterBuilder swb;
-                std::unique_ptr<Json::StreamWriter> usw(swb.newStreamWriter());
-                std::stringstream ss;
-                if (usw->write(val, &ss) != 0)
+                Json::StreamWriterBuilder swb;                                  // 创建一个 JSON 写入建造者
+                std::unique_ptr<Json::StreamWriter> usw(swb.newStreamWriter()); // 创建一个 JSON 写入器
+                std::stringstream ss;                                           // 创建一个字符串流
+                if (usw->write(val, &ss) != 0)                                  // 调用写入器中的接口进行序列化写入str
                 {
                     std::cout << "serialize error" << std::endl;
                     return false;
                 }
-                *str = ss.str();
+                *str = ss.str(); // 将序列化后的字符串写入到str中
                 return true;
             }
+            // 该函数用于反序列化json
             static bool UnSerialize(const std::string &str, Json::Value *val)
             {
                 // 操作方法类似序列化
-                Json::CharReaderBuilder crb;
-                std::unique_ptr<Json::CharReader> ucr(crb.newCharReader());
-                std::string err;
-                if (ucr->parse(str.c_str(), str.c_str() + str.size(), val, &err) == false)
+                Json::CharReaderBuilder crb;                                               // 创建一个 JSON 读取建造者
+                std::unique_ptr<Json::CharReader> ucr(crb.newCharReader());                // 创建一个 JSON 读取器
+                std::string err;                                                           // 创建一个错误信息字符串
+                if (ucr->parse(str.c_str(), str.c_str() + str.size(), val, &err) == false) // 调用读取器中的接口进行反序列化
                 {
-                    std::cout <<__FILE__<<__LINE__<<"parse error" << err<<std::endl;
+                    std::cout << __FILE__ << __LINE__ << "parse error" << err << std::endl;
                     return false;
                 }
                 return false;
             }
         };
-        struct JsonData{
-            static JsonData* GetJsonData(){
-               static JsonData* json_data = new JsonData;
-               return json_data;
+        // 该结构体用于存储配置文件中的数据
+        struct JsonData
+        {
+            // 该函数用于获取JsonData实例
+            static JsonData *GetJsonData()
+            {
+                static JsonData *json_data = new JsonData; // 单例模式
+                return json_data;
             }
-            private:
-                JsonData(){
+
+        private:
+            JsonData()
+            {
                 std::string content;
                 mylog::Util::File file;
-                if (file.GetContent(&content, "../../log_system/logs_code/config.conf") == false){
+                if (file.GetContent(&content, "../../log_system/logs_code/config.conf") == false)
+                {
                     std::cout << __FILE__ << __LINE__ << "open config.conf failed" << std::endl;
                     perror(NULL);
                 }
@@ -166,15 +182,19 @@ namespace mylog
                 backup_addr = root["backup_addr"].asString();
                 backup_port = root["backup_port"].asInt();
                 thread_count = root["thread_count"].asInt();
+                // 读取 config.conf 配置文件，并将 JSON 数据解析到 root 变量
+                // 将 root 的值赋给结构体成员变量，如 buffer_size、threshold 等
+                // 错误处理：如果 GetContent() 失败，输出错误并 perror(NULL)
             }
-            public:
-                size_t buffer_size;//缓冲区基础容量
-                size_t threshold;// 倍数扩容阈值
-                size_t linear_growth;// 线性增长容量
-                size_t flush_log;//控制日志同步到磁盘的时机，默认为0,1调用fflush，2调用fsync
-                std::string backup_addr;
-                uint16_t backup_port;
-                size_t thread_count;
+
+        public:
+            size_t buffer_size;   // 缓冲区基础容量
+            size_t threshold;     // 倍数扩容阈值
+            size_t linear_growth; // 线性增长容量
+            size_t flush_log;     // 控制日志同步到磁盘的时机，默认为0, 1调用fflush，2调用fsync
+            std::string backup_addr;
+            uint16_t backup_port;
+            size_t thread_count;
         };
     } // namespace Util
 } // namespace mylog
